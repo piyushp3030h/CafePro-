@@ -1,0 +1,15 @@
+# Compiled files
+*.exe
+*.o
+*.out
+
+# Runtime data
+data/*.dat
+data/*.tmp
+
+# IDE files
+.vscode/
+.idea/
+
+# Temporary files
+*.log
