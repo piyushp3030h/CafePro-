@@ -1,45 +1,37 @@
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 #include "product.h"
+#include "utils.h"
 
-/*
- * addProduct:
- * Appends a new product record to the binary data file.
- * Returns 1 on success, 0 on failure.
- */
+#define PRODUCT_TEMP_FILE "data/products.tmp"
+
 int addProduct(const Product *product) {
-    if (product == NULL) {
+    if (product == NULL || product->id <= 0 || product->price < 0 || product->stock_quantity < 0) {
+        return 0;
+    }
+    if (findProductById(product->id, NULL)) {
         return 0;
     }
 
     FILE *fp = fopen(PRODUCT_DATA_FILE, "ab");
     if (fp == NULL) {
-        perror("Error opening product data file for writing");
+        printf("\n[Error] Could not open %s.\n", PRODUCT_DATA_FILE);
         return 0;
     }
 
-    size_t written = fwrite(product, sizeof(Product), 1, fp);
+    int written = (int)fwrite(product, sizeof(Product), 1, fp);
     fclose(fp);
-
     return (written == 1) ? 1 : 0;
 }
 
-/*
- * displayAllProducts:
- * Reads and displays all products stored in the binary data file
- * in a clean, formatted table.
- */
-void displayAllProducts(void) {
+void viewProducts(void) {
     FILE *fp = fopen(PRODUCT_DATA_FILE, "rb");
     if (fp == NULL) {
-        printf("\n[Notice] No products found in inventory yet.\n");
+        printf("\n[Notice] No products in inventory yet.\n");
         return;
     }
 
     Product p;
-    int count = 0;
-
     printf("\n====================================================================\n");
     printf("                       PRODUCT INVENTORY                            \n");
     printf("====================================================================\n");
@@ -49,21 +41,11 @@ void displayAllProducts(void) {
     while (fread(&p, sizeof(Product), 1, fp) == 1) {
         printf("%-6d | %-22s | %-15s | %8.2f | %-6d\n",
                p.id, p.name, p.category, p.price, p.stock_quantity);
-        count++;
     }
-
     printf("====================================================================\n");
-    printf(" Total Products: %d\n", count);
-    printf("====================================================================\n");
-
     fclose(fp);
 }
 
-/*
- * findProductById:
- * Searches for a product by its unique ID.
- * Populates *found and returns 1 if found, 0 otherwise.
- */
 int findProductById(int id, Product *found) {
     FILE *fp = fopen(PRODUCT_DATA_FILE, "rb");
     if (fp == NULL) {
@@ -71,30 +53,29 @@ int findProductById(int id, Product *found) {
     }
 
     Product temp;
-    int match = 0;
-
     while (fread(&temp, sizeof(Product), 1, fp) == 1) {
         if (temp.id == id) {
             if (found != NULL) {
                 *found = temp;
             }
-            match = 1;
-            break;
+            fclose(fp);
+            return 1;
         }
     }
 
     fclose(fp);
-    return match;
+    return 0;
 }
 
-/*
- * updateProductStock:
- * Updates the stock of a product by adding quantity_change (+ for restock, - for sale).
- * Returns 1 on success, 0 on failure.
- */
 int updateProductStock(int id, int quantity_change) {
-    FILE *fp = fopen(PRODUCT_DATA_FILE, "rb+");
+    FILE *fp = fopen(PRODUCT_DATA_FILE, "rb");
     if (fp == NULL) {
+        return 0;
+    }
+
+    FILE *tmp = fopen(PRODUCT_TEMP_FILE, "wb");
+    if (tmp == NULL) {
+        fclose(fp);
         return 0;
     }
 
@@ -103,161 +84,110 @@ int updateProductStock(int id, int quantity_change) {
 
     while (fread(&temp, sizeof(Product), 1, fp) == 1) {
         if (temp.id == id) {
-            /* Prevent negative inventory */
             if (temp.stock_quantity + quantity_change < 0) {
-                printf("\n[Error] Insufficient stock! Available: %d, Requested change: %d\n",
-                       temp.stock_quantity, quantity_change);
+                printf("\n[Error] Not enough stock! Available: %d\n", temp.stock_quantity);
                 fclose(fp);
+                fclose(tmp);
+                remove(PRODUCT_TEMP_FILE);
                 return 0;
             }
-
             temp.stock_quantity += quantity_change;
-
-            /* Move file pointer back one record to overwrite */
-            fseek(fp, -(long)sizeof(Product), SEEK_CUR);
-            fwrite(&temp, sizeof(Product), 1, fp);
             updated = 1;
-            break;
         }
+        fwrite(&temp, sizeof(Product), 1, tmp);
     }
 
     fclose(fp);
+    fclose(tmp);
+
+    if (updated) {
+        remove(PRODUCT_DATA_FILE);
+        rename(PRODUCT_TEMP_FILE, PRODUCT_DATA_FILE);
+    } else {
+        remove(PRODUCT_TEMP_FILE);
+    }
     return updated;
 }
 
-/* Helper to safely read a string from stdin */
-static void readStringInput(char *buffer, int max_len) {
-    if (fgets(buffer, max_len, stdin) != NULL) {
-        size_t len = strlen(buffer);
-        if (len > 0 && buffer[len - 1] == '\n') {
-            buffer[len - 1] = '\0';
-        }
-    }
-}
-
-/*
- * productMenu:
- * Interactive sub-menu loop for managing cafe products and inventory.
- */
 void productMenu(void) {
     int choice = 0;
 
-    while (1) {
-        printf("\n=========================================\n");
-        printf("       PRODUCT & INVENTORY MENU          \n");
-        printf("=========================================\n");
-        printf(" 1. Add New Product\n");
-        printf(" 2. View All Products\n");
-        printf(" 3. Search Product by ID\n");
-        printf(" 4. Update Product Stock (Restock)\n");
-        printf(" 5. Back to Main Menu\n");
-        printf("=========================================\n");
-        printf("Enter your choice (1-5): ");
+    while (!feof(stdin)) {
+        printf("\n=== PRODUCT & INVENTORY ===\n");
+        printf("1. Add Product\n");
+        printf("2. View All Products\n");
+        printf("3. Restock Product\n");
+        printf("4. Back to Main Menu\n");
+        printf("Enter choice: ");
 
         if (scanf("%d", &choice) != 1) {
-            printf("\nInvalid input! Please enter a number.\n");
-            while (getchar() != '\n');
+            clearInputBuffer();
             continue;
         }
-        while (getchar() != '\n'); /* consume newline */
+        clearInputBuffer();
 
         if (choice == 1) {
-            Product new_prod;
-            printf("\nEnter Product ID (integer): ");
-            if (scanf("%d", &new_prod.id) != 1) {
-                printf("Invalid ID format!\n");
-                while (getchar() != '\n');
+            Product p;
+            printf("Enter Product ID: ");
+            if (scanf("%d", &p.id) != 1) {
+                clearInputBuffer();
                 continue;
             }
-            while (getchar() != '\n');
+            clearInputBuffer();
 
-            /* Check duplicate ID */
-            if (findProductById(new_prod.id, NULL)) {
-                printf("\n[Error] A product with ID %d already exists!\n", new_prod.id);
+            if (findProductById(p.id, NULL)) {
+                printf("[Error] Product ID %d already exists!\n", p.id);
                 continue;
             }
 
-            printf("Enter Product Name (e.g. Espresso, Croissant): ");
-            readStringInput(new_prod.name, MAX_NAME_LEN);
-
-            printf("Enter Category (e.g. Beverage, Bakery, Snack): ");
-            readStringInput(new_prod.category, MAX_CATEGORY_LEN);
+            printf("Enter Product Name: ");
+            readString(p.name, MAX_NAME_LEN);
+            printf("Enter Category: ");
+            readString(p.category, MAX_CATEGORY_LEN);
 
             printf("Enter Price: ");
-            if (scanf("%f", &new_prod.price) != 1 || new_prod.price < 0) {
-                printf("Invalid price! Price must be non-negative.\n");
-                while (getchar() != '\n');
+            if (scanf("%f", &p.price) != 1) {
+                clearInputBuffer();
                 continue;
             }
-
-            printf("Enter Initial Stock Quantity: ");
-            if (scanf("%d", &new_prod.stock_quantity) != 1 || new_prod.stock_quantity < 0) {
-                printf("Invalid stock quantity!\n");
-                while (getchar() != '\n');
+            printf("Enter Stock Quantity: ");
+            if (scanf("%d", &p.stock_quantity) != 1) {
+                clearInputBuffer();
                 continue;
             }
-            while (getchar() != '\n');
+            clearInputBuffer();
 
-            if (addProduct(&new_prod)) {
-                printf("\n[Success] Product '%s' (ID: %d) added successfully!\n",
-                       new_prod.name, new_prod.id);
+            if (addProduct(&p)) {
+                printf("[Success] Product '%s' added!\n", p.name);
             } else {
-                printf("\n[Failure] Failed to save product.\n");
+                printf("[Error] Could not add product.\n");
             }
-
         } else if (choice == 2) {
-            displayAllProducts();
-
+            viewProducts();
         } else if (choice == 3) {
-            int search_id;
-            printf("\nEnter Product ID to search: ");
-            if (scanf("%d", &search_id) != 1) {
-                printf("Invalid ID!\n");
-                while (getchar() != '\n');
-                continue;
-            }
-            while (getchar() != '\n');
-
-            Product found;
-            if (findProductById(search_id, &found)) {
-                printf("\nProduct Found:\n");
-                printf("  ID:       %d\n", found.id);
-                printf("  Name:     %s\n", found.name);
-                printf("  Category: %s\n", found.category);
-                printf("  Price:    $%.2f\n", found.price);
-                printf("  Stock:    %d units\n", found.stock_quantity);
-            } else {
-                printf("\n[Notice] No product found with ID %d.\n", search_id);
-            }
-
-        } else if (choice == 4) {
             int id, qty;
-            printf("\nEnter Product ID to update stock: ");
+            printf("Enter Product ID: ");
             if (scanf("%d", &id) != 1) {
-                printf("Invalid ID!\n");
-                while (getchar() != '\n');
+                clearInputBuffer();
                 continue;
             }
-            printf("Enter Quantity to Add (positive number): ");
+            printf("Enter Quantity to Add: ");
             if (scanf("%d", &qty) != 1 || qty <= 0) {
-                printf("Invalid quantity! Must be greater than 0.\n");
-                while (getchar() != '\n');
+                clearInputBuffer();
+                printf("[Error] Quantity must be positive.\n");
                 continue;
             }
-            while (getchar() != '\n');
+            clearInputBuffer();
 
             if (updateProductStock(id, qty)) {
-                printf("\n[Success] Stock updated successfully!\n");
+                printf("[Success] Stock updated!\n");
             } else {
-                printf("\n[Failure] Product ID not found or could not be updated.\n");
+                printf("[Error] Product ID not found.\n");
             }
-
-        } else if (choice == 5) {
-            printf("\nReturning to Main Menu...\n");
+        } else if (choice == 4) {
             break;
         } else {
-            printf("\nInvalid option! Please choose between 1 and 5.\n");
+            printf("Invalid choice! Pick 1 to 4.\n");
         }
     }
 }
-

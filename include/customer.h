@@ -9,14 +9,11 @@ typedef struct {
     int id;
     char name[MAX_CUST_NAME_LEN];
     char phone[MAX_PHONE_LEN];
-    int loyalty_points;
 } Customer;
 
-/* Function Declarations - Customer Module */
 void customerMenu(void);
 int addCustomer(const Customer *customer);
-void displayAllCustomers(void);
+void viewCustomers(void);
 int findCustomerByPhone(const char *phone, Customer *found);
 
-#endif /* CUSTOMER_H */
-
+#endif

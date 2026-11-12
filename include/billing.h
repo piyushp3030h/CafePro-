@@ -17,8 +17,7 @@ typedef struct {
 
 typedef struct {
     int bill_id;
-    int customer_id;
-    char date[20];
+    char customer_name[MAX_CUST_NAME_LEN];
     OrderItem items[MAX_ITEMS_PER_BILL];
     int item_count;
     float total_amount;
@@ -26,10 +25,10 @@ typedef struct {
     float final_amount;
 } Bill;
 
-/* Function Declarations - Billing & Order Module */
 void billingMenu(void);
-void generateBill(void);
-void displaySalesReport(void);
+int saveBill(const Bill *bill);
+void createBill(void);
+void viewBills(void);
+void viewSalesReport(void);
 
-#endif /* BILLING_H */
-
+#endif
