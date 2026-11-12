@@ -13,12 +13,10 @@ typedef struct {
     int stock_quantity;
 } Product;
 
-/* Function Declarations - Product & Inventory Module */
 void productMenu(void);
 int addProduct(const Product *product);
-void displayAllProducts(void);
+void viewProducts(void);
 int findProductById(int id, Product *found);
 int updateProductStock(int id, int quantity_change);
 
-#endif /* PRODUCT_H */
-
+#endif
