@@ -11,7 +11,6 @@ CafePro/
 ├── include/     # Header files (.h) defining structs and function declarations
 ├── src/         # Implementation files (.c) for each feature
 ├── data/        # Binary files (.dat) storing runtime records
-├── tests/       # Automated test suite (test_cafepro.c)
 ├── docs/        # Documentation and learning guides
 ├── main.c       # Main menu and program entry point
 └── Makefile     # Build script for GCC
@@ -51,16 +50,12 @@ All data is stored directly as binary structs:
 
 ## 6. How to Build and Run
 ```bash
-# Compile the main project
+# Compile the project
 mingw32-make
 
 # Run the application
 .\cafepro.exe
 
-# Run automated tests
-mingw32-make test
-
-# Clean compiled executables
+# Clean compiled executable
 mingw32-make clean
 ```
-
