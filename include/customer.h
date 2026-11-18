@@ -15,5 +15,6 @@ void customerMenu(void);
 int addCustomer(const Customer *customer);
 void viewCustomers(void);
 int findCustomerByPhone(const char *phone, Customer *found);
+int getNextCustomerId(void);
 
 #endif

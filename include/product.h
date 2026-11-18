@@ -18,5 +18,6 @@ int addProduct(const Product *product);
 void viewProducts(void);
 int findProductById(int id, Product *found);
 int updateProductStock(int id, int quantity_change);
+int deleteProduct(int id);
 
 #endif

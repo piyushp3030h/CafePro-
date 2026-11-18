@@ -30,5 +30,6 @@ int saveBill(const Bill *bill);
 void createBill(void);
 void viewBills(void);
 void viewSalesReport(void);
+void printReceiptToPrinter(const Bill *bill);
 
 #endif
