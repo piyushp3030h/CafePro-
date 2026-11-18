@@ -68,6 +68,23 @@ int findCustomerByPhone(const char *phone, Customer *found) {
     return 0;
 }
 
+int getNextCustomerId(void) {
+    FILE *fp = fopen(CUSTOMER_DATA_FILE, "rb");
+    if (fp == NULL) {
+        return 1;
+    }
+
+    Customer temp;
+    int max_id = 0;
+    while (fread(&temp, sizeof(Customer), 1, fp) == 1) {
+        if (temp.id > max_id) {
+            max_id = temp.id;
+        }
+    }
+    fclose(fp);
+    return max_id + 1;
+}
+
 void customerMenu(void) {
     int choice = 0;
 

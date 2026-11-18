@@ -13,3 +13,6 @@ data/*.tmp
 
 # Temporary files
 *.log
+
+# Ignore documentation folder
+docs/

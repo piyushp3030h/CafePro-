@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include "billing.h"
 #include "utils.h"
@@ -32,13 +33,48 @@ void createBill(void) {
     }
     clearInputBuffer();
 
-    printf("Enter Customer Phone (press Enter for Guest): ");
+    printf("Enter Customer Phone (press Enter or 0 for Guest): ");
     readString(phone, MAX_PHONE_LEN);
-    if (strlen(phone) > 0 && findCustomerByPhone(phone, &cust)) {
-        strcpy(bill.customer_name, cust.name);
-        printf("Customer found: %s\n", bill.customer_name);
-    } else {
+
+    if (strlen(phone) == 0 || strcmp(phone, "0") == 0) {
         strcpy(bill.customer_name, "Guest");
+        printf("Proceeding as Guest customer.\n");
+    } else if (findCustomerByPhone(phone, &cust)) {
+        strcpy(bill.customer_name, cust.name);
+        printf("[Member Found] Welcome back, %s! (ID: %d)\n", bill.customer_name, cust.id);
+    } else {
+        printf("[Notice] Phone '%s' is not registered in our customer directory.\n", phone);
+        printf("Would you like to register this customer now?\n");
+        printf("  1. Yes, register customer\n");
+        printf("  2. No, continue as Guest\n");
+        printf("Enter choice (1 or 2): ");
+        int reg_choice = 2;
+        if (scanf("%d", &reg_choice) != 1) {
+            clearInputBuffer();
+            reg_choice = 2;
+        } else {
+            clearInputBuffer();
+        }
+
+        if (reg_choice == 1) {
+            Customer new_cust;
+            new_cust.id = getNextCustomerId();
+            strcpy(new_cust.phone, phone);
+            printf("Enter Customer Name: ");
+            readString(new_cust.name, MAX_CUST_NAME_LEN);
+
+            if (strlen(new_cust.name) > 0 && addCustomer(&new_cust)) {
+                strcpy(bill.customer_name, new_cust.name);
+                printf("[Success] Customer '%s' (ID: %d) registered and linked to this bill!\n",
+                       bill.customer_name, new_cust.id);
+            } else {
+                strcpy(bill.customer_name, "Guest");
+                printf("[Notice] Registration skipped; continuing as Guest.\n");
+            }
+        } else {
+            strcpy(bill.customer_name, "Guest");
+            printf("Continuing as Guest customer.\n");
+        }
     }
 
     viewProducts();
@@ -119,7 +155,64 @@ void createBill(void) {
         printf("Discount: -$%.2f\n", bill.discount);
         printf("PAYABLE:  $%.2f\n", bill.final_amount);
         printf("=================================================\n");
+
+        printf("\nPrint receipt to printer? (1: Yes, 2: Skip): ");
+        int prn_choice = 2;
+        if (scanf("%d", &prn_choice) == 1) {
+            clearInputBuffer();
+        } else {
+            clearInputBuffer();
+            prn_choice = 2;
+        }
+
+        if (prn_choice == 1) {
+            printReceiptToPrinter(&bill);
+        }
     }
+}
+
+void printReceiptToPrinter(const Bill *bill) {
+    if (bill == NULL) {
+        return;
+    }
+
+    const char *receipt_file = "data/receipt.txt";
+    FILE *fp = fopen(receipt_file, "w");
+    if (fp == NULL) {
+        printf("[Error] Could not generate receipt file for printing.\n");
+        return;
+    }
+
+    fprintf(fp, "=================================================\n");
+    fprintf(fp, "                     CAFEPRO                     \n");
+    fprintf(fp, "         CAFE BILLING & INVENTORY SYSTEM         \n");
+    fprintf(fp, "=================================================\n");
+    fprintf(fp, "Bill ID  : #%d\n", bill->bill_id);
+    fprintf(fp, "Customer : %s\n", bill->customer_name);
+    fprintf(fp, "-------------------------------------------------\n");
+    fprintf(fp, "%-20s %-5s   %8s   %9s\n", "Item", "Qty", "Price", "Subtotal");
+    fprintf(fp, "-------------------------------------------------\n");
+
+    for (int i = 0; i < bill->item_count; i++) {
+        fprintf(fp, "%-20s x%-4d  $%7.2f  $%8.2f\n",
+                bill->items[i].product_name,
+                bill->items[i].quantity,
+                bill->items[i].unit_price,
+                bill->items[i].subtotal);
+    }
+
+    fprintf(fp, "-------------------------------------------------\n");
+    fprintf(fp, "Total Amount : $%8.2f\n", bill->total_amount);
+    fprintf(fp, "Discount     : -$%7.2f\n", bill->discount);
+    fprintf(fp, "FINAL PAYABLE: $%8.2f\n", bill->final_amount);
+    fprintf(fp, "=================================================\n");
+    fprintf(fp, "            Thank you for your visit!            \n");
+    fprintf(fp, "=================================================\n\n\n\n");
+    fclose(fp);
+
+    printf("[Printing] Sending receipt to Windows Default Printer...\n");
+    system("notepad /p data\\receipt.txt");
+    printf("[Success] Print job queued successfully!\n");
 }
 
 void viewBills(void) {
